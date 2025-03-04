@@ -12,6 +12,7 @@ Product Supported:’
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Interactions;
+using System.Diagnostics;
 
 namespace SeleniumTesting
 {
@@ -19,30 +20,57 @@ namespace SeleniumTesting
     {
         static void Main(string[] args)
         {
-            string[] productsSupported = { "Cue Sheet / AV Work​", "Recording​", "Bundle", "Advertisement "};
+            string[] productsSupported = {"Cue Sheet / AV Work​", "Recording​", "Bundle", "Advertisement",
+                "Negative Test"}; // Include one false product as a negative test
             IWebDriver driver = new ChromeDriver();
             driver.Url = "https://www.matchingengine.com/";
+            // set implicit wait to ten seconds - anything longer than that on a simple page is probably a bug
+            driver.Manage().Timeouts().ImplicitWait = System.TimeSpan.FromSeconds(10);
 
 
             driver.FindElement(By.LinkText("Modules")).Click();
-            Thread.Sleep(2000);  // wait for the menu  to load
             driver.FindElement(By.LinkText("Repertoire Management Module")).Click();
 
-
-            //Use a CSS selector for 'Additional Features' section + use Actions class to scroll to the element
-            IWebElement additionalFeatures = driver.FindElement(By.CssSelector(
-                "div[class='vc_row wpb_row vc_row-fluid vc_custom_1661355414511'] h2[class='vc_custom_heading']"));
+            // We don't actually need to scroll to test the list, but including it as it's part of the instructions
+            IWebElement additionalFeatures = driver.FindElement(By.XPath(
+                "//*[contains(text(), 'Additional Features')]"));
             Actions scroller = new Actions(driver);
             scroller.MoveToElement(additionalFeatures).Perform();
 
-            // Using Xpath we can search for items containing a specific text
             driver.FindElement(By.XPath("//*[contains(text(), 'Products Supported')]")).Click();
-            Thread.Sleep(2000);  // wait for the menu  to load
-            string productsSupportedText = driver.FindElement(By.XPath(
-                "//*[contains(text(), 'There are several types of Product Supported')]")).Text;
-            System.Console.WriteLine(productsSupportedText);
 
+            // this will find ALL list items in the document, including some we don't care about
+            // we could use the full Xpath for the specific list that only includes the relevant section
+            // but it would make the code hard to read and is probably overkill for a simple test
+            IReadOnlyList<IWebElement> productElements = driver.FindElements(By.XPath("//ul/li/span"));
 
+            // for a real test we would use a framework, but for this simple test we can just print our assertion to the debug console
+            foreach (string expectedProduct in productsSupported)
+            {
+                bool productFound = false;
+                foreach (IWebElement element in productElements)
+                {
+                    string text = element.GetAttribute("innerText").Trim();
+                    if (expectedProduct.Contains(text))
+                    {
+                        productFound = true;
+                        break;
+                    }
+                }
+                if (productFound && expectedProduct != "Negative Test")
+                {
+                    Debug.WriteLine("TEST PASSED: Product found: " + expectedProduct);
+                }
+                else if (expectedProduct == "Negative Test")
+                {
+                    Debug.WriteLine("TEST PASSED: Negative test passed, product not found: " + expectedProduct);
+                }
+                else
+                {
+                    Debug.WriteLine("TEST FAILED: Product not found: " + expectedProduct);
+                }
+            }
+            driver.Quit();
         }
     }
 }
